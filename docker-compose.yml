@@ -1,11 +1,19 @@
 version: '3.8'
 
 services:
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5125:80"
+    depends_on:
+      - api
+
   api:
     build:
       context: ./backend
     ports:
-      - "8000:8000"
+      - "5126:8000"
     volumes:
       - ./backend:/app
     env_file:
@@ -17,8 +25,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
 
