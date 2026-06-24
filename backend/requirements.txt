@@ -5,3 +5,4 @@ httpx>=0.25.0
 apscheduler>=3.10.4
 pydantic>=2.4.2
 pydantic-settings>=2.0.3
+isodate>=0.6.1
