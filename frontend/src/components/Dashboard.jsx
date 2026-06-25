@@ -48,6 +48,15 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
     return () => { isMounted = false; };
   }, [location]);
 
+  useEffect(() => {
+    if (location && location.name) {
+      const capitalized = location.name.charAt(0).toUpperCase() + location.name.slice(1);
+      document.title = `MWS - ${capitalized}`;
+    } else {
+      document.title = 'My Weather Service';
+    }
+  }, [location]);
+
   const isDark = theme === 'dark';
   const colorTextSecondary = isDark ? '#94a3b8' : '#64748b';
   const colorTextPrimary = isDark ? '#f8fafc' : '#0f172a';
