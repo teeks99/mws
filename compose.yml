@@ -1,21 +1,15 @@
-version: '3.8'
-
 services:
   frontend:
-    build:
-      context: ./frontend
+    image: teeks99/mws-frontend:latest
     ports:
       - "5125:80"
     depends_on:
       - api
 
   api:
-    build:
-      context: ./backend
+    image: teeks99/mws-backend:latest
     ports:
       - "5126:8000"
-    volumes:
-      - ./backend:/app
     env_file:
       - .env
     environment:
