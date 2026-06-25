@@ -28,7 +28,7 @@ from app.routers import locations
 
 app = FastAPI(
     lifespan=lifespan, 
-    title="Personal Weather Service API",
+    title="My Weather Service API",
     description="API for retrieving heavily cached, flattened weather forecasts from the NWS."
 )
 
@@ -58,7 +58,7 @@ app.include_router(locations.router)
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to Personal Weather Service API"}
+    return {"message": "Welcome to My Weather Service API"}
 
 @app.get("/api/forecast/{name}", response_model=List[HourlyForecast])
 async def get_forecast(name: str):

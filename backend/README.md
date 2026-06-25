@@ -1,4 +1,4 @@
-# Personal Weather Service Backend API
+# My Weather Service Backend API
 
 This backend is built with FastAPI and Redis. It provides a highly cached, extremely fast API to retrieve flattened, hour-by-hour weather forecasts.
 

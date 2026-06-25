@@ -38,7 +38,7 @@ export default function Sidebar({
   return (
     <div className={`glass-panel sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-header">
-        <h1>Personal Weather</h1>
+        <h1>My Weather Service</h1>
       </div>
 
       <div className="location-list">
