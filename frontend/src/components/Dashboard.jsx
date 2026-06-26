@@ -169,9 +169,25 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
   const legend3Top = grid2Top + CH + 46;
   const grid3Top = grid2Top + CH + 74;
 
+  const nowIndex = forecast.findIndex(d => !d.is_past);
+  const splitIdx = nowIndex > 0 ? nowIndex : 0;
+  
+  // The time axis (dimension 0) uses Unix timestamps internally in ECharts
+  const splitTime = splitIdx > 0 ? new Date(times[splitIdx]).getTime() : 0;
+
   const combinedOption = {
     backgroundColor: 'transparent',
     animation: false,
+    visualMap: {
+      type: 'piecewise',
+      show: false,
+      dimension: 0,
+      seriesIndex: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      pieces: [
+        { max: splitTime - 1, opacity: 0.25 },
+        { min: splitTime, opacity: 1.0 }
+      ]
+    },
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross', lineStyle: { color: colorAxisPointer } },
@@ -211,7 +227,15 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
     ],
     series: [
       // Chart 1
-      { name: 'Temperature', xAxisIndex: 0, yAxisIndex: 0, type: 'line', data: temps.map((v, i) => [times[i], v]), itemStyle: { color: '#ef4444' }, smooth: true, symbol: 'none', tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(isUS ? 0 : 1) : val } },
+      { 
+        name: 'Temperature', xAxisIndex: 0, yAxisIndex: 0, type: 'line', data: temps.map((v, i) => [times[i], v]), itemStyle: { color: '#ef4444' }, smooth: true, symbol: 'none', tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(isUS ? 0 : 1) : val },
+        markLine: {
+          symbol: ['none', 'none'],
+          label: { show: false },
+          lineStyle: { type: 'dashed', color: colorTextSecondary, width: 2 },
+          data: splitIdx > 0 ? [{ xAxis: times[splitIdx] }] : []
+        }
+      },
       { name: 'Dew Point', xAxisIndex: 0, yAxisIndex: 0, type: 'line', data: dews.map((v, i) => [times[i], v]), itemStyle: { color: '#10b981' }, smooth: true, symbol: 'none', tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(isUS ? 0 : 1) : val } },
       { name: 'Feels Like', xAxisIndex: 0, yAxisIndex: 0, type: 'line', data: feels.map((v, i) => [times[i], v]), itemStyle: { color: '#8b5cf6' }, smooth: true, lineStyle: { type: 'dashed' }, symbol: 'none', tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(isUS ? 0 : 1) : val } },
       

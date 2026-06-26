@@ -50,10 +50,11 @@ def parse_nws_time(valid_time_str):
     duration = isodate.parse_duration(duration_str)
     return start_time, start_time + duration
 
-def process_nws_data(raw_data: dict):
+def process_nws_data(raw_data: dict, old_forecast: list = None):
     """
     Parses the GeoJSON NWS data and flattens it into a unified, 
     hour-by-hour timeseries array for the next 168 hours (7 days).
+    Optionally prepends up to 24 hours of historical data.
     """
     if not raw_data or 'properties' not in raw_data:
         return []
@@ -94,8 +95,21 @@ def process_nws_data(raw_data: dict):
             except Exception as e:
                 logger.error(f"Error parsing time {valid_time}: {e}")
                 
-    # Convert dictionary to sorted list
-    result = [hourly_data[now + timedelta(hours=i)] for i in range(168)]
+    # Extract up to 24 hours of past data from the old forecast
+    past_data = []
+    if old_forecast:
+        cutoff = now - timedelta(hours=24)
+        for item in old_forecast:
+            try:
+                item_time = datetime.fromisoformat(item["timestamp"])
+                if cutoff <= item_time < now:
+                    item["is_past"] = True
+                    past_data.append(item)
+            except Exception as e:
+                logger.error(f"Error parsing old forecast timestamp: {e}")
+
+    # Combine past data and future 168h block
+    result = past_data + [hourly_data[now + timedelta(hours=i)] for i in range(168)]
     return result
 
 async def update_weather_data_for_location(redis_client, loc: dict):
@@ -107,7 +121,10 @@ async def update_weather_data_for_location(redis_client, loc: dict):
     logger.info(f"Fetching data for {loc_id}...")
     raw_data = await fetch_nws_grid_data(wfo, x, y)
     if raw_data:
-        processed_data = process_nws_data(raw_data)
+        old_data_str = await redis_client.get(f"forecast:{loc_id}")
+        old_forecast = json.loads(old_data_str) if old_data_str else None
+        
+        processed_data = process_nws_data(raw_data, old_forecast)
         await redis_client.set(f"forecast:{loc_id}", json.dumps(processed_data))
         logger.info(f"Successfully updated data for {loc_id}")
     else:

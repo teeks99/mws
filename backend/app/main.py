@@ -34,6 +34,7 @@ app = FastAPI(
 
 class HourlyForecast(BaseModel):
     timestamp: str = Field(..., description="ISO 8601 timestamp for this hourly bucket in UTC.")
+    is_past: Optional[bool] = Field(False, description="True if this is historical data from a previous fetch.")
     temperature: Optional[float] = Field(None, description="Temperature in Degrees Celsius (°C).")
     dewpoint: Optional[float] = Field(None, description="Dewpoint in Degrees Celsius (°C).")
     apparentTemperature: Optional[float] = Field(None, description="Apparent Temperature (Feels Like) in Degrees Celsius (°C).")
