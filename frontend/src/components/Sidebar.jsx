@@ -13,12 +13,16 @@ export default function Sidebar({
   unitSystem,
   setUnitSystem,
   theme,
-  setTheme
+  setTheme,
+  sortOrder,
+  setSortOrder,
+  onReorder
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newLat, setNewLat] = useState('');
   const [newLon, setNewLon] = useState('');
+  const [draggedItem, setDraggedItem] = useState(null);
 
   const handleAdd = (e) => {
     e.preventDefault();
@@ -37,8 +41,22 @@ export default function Sidebar({
 
   return (
     <div className={`glass-panel sidebar ${isOpen ? 'open' : ''}`}>
-      <div className="sidebar-header">
+      <div className="sidebar-header" style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
         <h1>My Weather Service</h1>
+        {locations.length > 0 && (
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <span style={{fontSize: '0.85rem', color: 'var(--text-secondary)'}}>Locations</span>
+            <select 
+              value={sortOrder} 
+              onChange={e => setSortOrder(e.target.value)}
+              style={{background: 'rgba(0,0,0,0.2)', color: 'var(--text-secondary)', border: '1px solid var(--panel-border)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.8rem', outline: 'none'}}
+            >
+              <option value="az">Sort A-Z</option>
+              <option value="za">Sort Z-A</option>
+              <option value="manual">Manual</option>
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="location-list">
@@ -46,7 +64,29 @@ export default function Sidebar({
           <div 
             key={loc.name}
             className={`location-item ${activeLocation?.name === loc.name ? 'active' : ''}`}
+            draggable
             onClick={() => onSelectLocation(loc)}
+            onDragStart={(e) => {
+              setDraggedItem(loc.name);
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            onDragEnd={() => setDraggedItem(null)}
+            onDragOver={(e) => {
+              e.preventDefault(); // Necessary to allow dropping
+              if (draggedItem && draggedItem !== loc.name) {
+                e.currentTarget.style.borderTop = '2px solid #3b82f6';
+              }
+            }}
+            onDragLeave={(e) => {
+              e.currentTarget.style.borderTop = '';
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.currentTarget.style.borderTop = '';
+              if (draggedItem && draggedItem !== loc.name) {
+                onReorder(draggedItem, loc.name);
+              }
+            }}
           >
             <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
               <MapPin size={18} color={activeLocation?.name === loc.name ? '#3b82f6' : '#94a3b8'} />
