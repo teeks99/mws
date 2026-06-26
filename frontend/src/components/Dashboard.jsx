@@ -4,6 +4,7 @@ import ReactECharts from 'echarts-for-react';
 
 export default function Dashboard({ location, onToggleSidebar, unitSystem, theme = 'dark' }) {
   const [forecast, setForecast] = useState([]);
+  const [astronomy, setAstronomy] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const containerRef = React.useRef(null);
@@ -28,22 +29,30 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
     setLoading(true);
     setError(null);
 
-    fetch(`/api/forecast/${location.name}`)
-      .then(res => res.json())
-      .then(data => {
-        if (!isMounted) return;
-        if (data.error) {
-          setError(data.error);
-        } else {
-          setForecast(data);
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        if (!isMounted) return;
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [forecastRes, astroRes] = await Promise.all([
+          fetch(`/api/forecast/${encodeURIComponent(location.name)}`),
+          fetch(`/api/astronomy/${encodeURIComponent(location.name)}`)
+        ]);
+        
+        const forecastData = await forecastRes.json();
+        const astroData = await astroRes.json();
+        
+        if (forecastData.error) throw new Error(forecastData.error);
+        
+        setForecast(forecastData);
+        setAstronomy(astroData.error ? null : astroData);
+      } catch (err) {
         setError(err.message);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+    
+    loadData();
 
     return () => { isMounted = false; };
   }, [location]);
@@ -175,6 +184,50 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
   // The time axis (dimension 0) uses Unix timestamps internally in ECharts
   const splitTime = splitIdx > 0 ? new Date(times[splitIdx]).getTime() : 0;
 
+  // Compute Night Time blocks (markArea data)
+  const nightBlocks = [];
+  if (astronomy && astronomy.sunrise && astronomy.sunset && times.length > 0) {
+    const sunriseTime = new Date(astronomy.sunrise).getTime();
+    const sunsetTime = new Date(astronomy.sunset).getTime();
+    
+    const firstTimeMs = new Date(times[0]).getTime();
+    const lastTimeMs = new Date(times[times.length - 1]).getTime();
+    
+    let baseSunset = sunsetTime;
+    while (baseSunset > firstTimeMs - (24 * 3600 * 1000)) {
+      baseSunset -= 24 * 3600 * 1000;
+    }
+    
+    let baseSunrise = sunriseTime;
+    while (baseSunrise < baseSunset) {
+      baseSunrise += 24 * 3600 * 1000;
+    }
+    while (baseSunrise - (24 * 3600 * 1000) > baseSunset) {
+      baseSunrise -= 24 * 3600 * 1000;
+    }
+    
+    while (baseSunset <= lastTimeMs) {
+      nightBlocks.push([
+        { xAxis: baseSunset },
+        { xAxis: baseSunrise }
+      ]);
+      baseSunset += 24 * 3600 * 1000;
+      baseSunrise += 24 * 3600 * 1000;
+    }
+  }
+
+  const nightMarkArea = {
+    itemStyle: { color: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.05)' },
+    data: nightBlocks
+  };
+
+  const nowMarkLine = {
+    symbol: ['none', 'none'],
+    label: { show: false },
+    lineStyle: { type: 'dashed', color: colorTextSecondary, width: 2 },
+    data: splitIdx > 0 ? [{ xAxis: times[splitIdx] }] : []
+  };
+
   const combinedOption = {
     backgroundColor: 'transparent',
     animation: false,
@@ -182,7 +235,7 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
       type: 'piecewise',
       show: false,
       dimension: 0,
-      seriesIndex: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      seriesIndex: [0, 1, 2, 4, 5, 6, 7, 8, 9],
       pieces: [
         { max: splitTime - 1, opacity: 0.25 },
         { min: splitTime, opacity: 1.0 }
@@ -229,23 +282,26 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
       // Chart 1
       { 
         name: 'Temperature', xAxisIndex: 0, yAxisIndex: 0, type: 'line', data: temps.map((v, i) => [times[i], v]), itemStyle: { color: '#ef4444' }, smooth: true, symbol: 'none', tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(isUS ? 0 : 1) : val },
-        markLine: {
-          symbol: ['none', 'none'],
-          label: { show: false },
-          lineStyle: { type: 'dashed', color: colorTextSecondary, width: 2 },
-          data: splitIdx > 0 ? [{ xAxis: times[splitIdx] }] : []
-        }
+        markArea: nightMarkArea,
+        markLine: nowMarkLine
       },
       { name: 'Dew Point', xAxisIndex: 0, yAxisIndex: 0, type: 'line', data: dews.map((v, i) => [times[i], v]), itemStyle: { color: '#10b981' }, smooth: true, symbol: 'none', tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(isUS ? 0 : 1) : val } },
       { name: 'Feels Like', xAxisIndex: 0, yAxisIndex: 0, type: 'line', data: feels.map((v, i) => [times[i], v]), itemStyle: { color: '#8b5cf6' }, smooth: true, lineStyle: { type: 'dashed' }, symbol: 'none', tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(isUS ? 0 : 1) : val } },
       
       // Chart 2
-      { name: 'Precip Chance', xAxisIndex: 1, yAxisIndex: 1, type: 'bar', data: precips.map((v, i) => [times[i], v]), itemStyle: { color: '#0ea5e9', opacity: 0.25 }, barMaxWidth: 10, tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(0) + '%' : val } },
+      { 
+        name: 'Precip Chance', xAxisIndex: 1, yAxisIndex: 1, type: 'bar', 
+        data: precips.map((v, i) => ({
+          value: [times[i], v],
+          itemStyle: { opacity: i < splitIdx ? 0.25 : 0.8 }
+        })), 
+        itemStyle: { color: '#0ea5e9' }, barMaxWidth: 10, tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(0) + '%' : val }, markArea: nightMarkArea, markLine: nowMarkLine 
+      },
       { name: 'Humidity', xAxisIndex: 1, yAxisIndex: 1, type: 'line', data: humids.map((v, i) => [times[i], v]), itemStyle: { color: '#3b82f6' }, smooth: true, symbol: 'none', tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(0) + '%' : val } },
       { name: 'Cloud Cover', xAxisIndex: 1, yAxisIndex: 1, type: 'line', data: clouds.map((v, i) => [times[i], v]), itemStyle: { color: '#64748b' }, smooth: true, areaStyle: { opacity: 0.1 }, symbol: 'none', tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(0) + '%' : val } },
       
       // Chart 3
-      { name: 'Wind Speed', xAxisIndex: 2, yAxisIndex: 2, type: 'line', data: windSpeeds.map((v, i) => [times[i], v]), itemStyle: { color: '#06b6d4' }, smooth: true, areaStyle: { opacity: 0.1 }, symbol: 'none', tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(1) : val } },
+      { name: 'Wind Speed', xAxisIndex: 2, yAxisIndex: 2, type: 'line', data: windSpeeds.map((v, i) => [times[i], v]), itemStyle: { color: '#06b6d4' }, smooth: true, areaStyle: { opacity: 0.1 }, symbol: 'none', tooltip: { valueFormatter: (val) => val != null && !isNaN(val) ? Number(val).toFixed(1) : val }, markArea: nightMarkArea, markLine: nowMarkLine },
       { 
         name: 'Wind Dir', 
         type: 'scatter', 

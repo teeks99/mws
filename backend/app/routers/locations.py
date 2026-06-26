@@ -62,7 +62,7 @@ async def add_location(location: LocationCreate, api_key: str = Depends(get_api_
     if not main_app.redis_client:
         raise HTTPException(status_code=500, detail="Redis not initialized")
     
-    wfo, x, y = await get_nws_gridpoints(location.lat, location.lon)
+    wfo, x, y, astro = await get_nws_gridpoints(location.lat, location.lon)
     if not wfo or x is None or y is None:
         raise HTTPException(status_code=400, detail="Could not determine NWS grid points for these coordinates. Are they in the US?")
     
@@ -81,6 +81,8 @@ async def add_location(location: LocationCreate, api_key: str = Depends(get_api_
         location.name,
         json.dumps(loc_data.model_dump())
     )
+    if astro:
+        await main_app.redis_client.set(f"astro:{location.name}", json.dumps(astro))
     
     # Optionally trigger an immediate NWS fetch for this location
     from app.services.nws import update_weather_data_for_location
@@ -98,7 +100,8 @@ async def remove_location(name: str, api_key: str = Depends(get_api_key)):
     if not deleted:
         raise HTTPException(status_code=404, detail="Location not found")
         
-    # Also delete the cached forecast
+    # Also delete the cached forecast and astronomy data
     await main_app.redis_client.delete(f"forecast:{name}")
+    await main_app.redis_client.delete(f"astro:{name}")
     
     return {"message": f"Location '{name}' removed"}

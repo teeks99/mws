@@ -73,8 +73,22 @@ async def get_forecast(name: str):
     
     data = await redis_client.get(f"forecast:{name}")
     if data:
-        # Assuming the data is stored as a JSON string
         import json
         return json.loads(data)
     
     return {"error": "Forecast not found for this location"}
+
+@app.get("/api/astronomy/{name}")
+async def get_astronomy(name: str):
+    """
+    Retrieve the cached astronomical data (sunrise/sunset) for a given location.
+    """
+    if not redis_client:
+        return {"error": "Redis client not initialized"}
+    
+    data = await redis_client.get(f"astro:{name}")
+    if data:
+        import json
+        return json.loads(data)
+        
+    return {"error": "Astronomy data not found for this location"}

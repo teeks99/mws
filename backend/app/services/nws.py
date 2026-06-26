@@ -24,10 +24,10 @@ async def get_nws_gridpoints(lat: float, lon: float):
             response.raise_for_status()
             data = response.json()
             props = data.get("properties", {})
-            return props.get("gridId"), props.get("gridX"), props.get("gridY")
+            return props.get("gridId"), props.get("gridX"), props.get("gridY"), props.get("astronomicalData", {})
         except httpx.HTTPError as exc:
             logger.error(f"Error fetching NWS points for {lat},{lon}: {exc}")
-            return None, None, None
+            return None, None, None, None
 
 async def fetch_nws_grid_data(wfo: str, x: int, y: int):
     """Fetches the raw grid data from NWS."""
@@ -96,6 +96,7 @@ def process_nws_data(raw_data: dict, old_forecast: list = None):
                 logger.error(f"Error parsing time {valid_time}: {e}")
                 
     # Extract up to 24 hours of past data from the old forecast
+    # and patch any missing data in the current forecast using the old forecast.
     past_data = []
     if old_forecast:
         cutoff = now - timedelta(hours=24)
@@ -105,6 +106,12 @@ def process_nws_data(raw_data: dict, old_forecast: list = None):
                 if cutoff <= item_time < now:
                     item["is_past"] = True
                     past_data.append(item)
+                elif item_time >= now:
+                    # Patch any holes in the newly fetched forecast using old predictions
+                    if item_time in hourly_data:
+                        for metric in metrics:
+                            if metric not in hourly_data[item_time] and metric in item:
+                                hourly_data[item_time][metric] = item[metric]
             except Exception as e:
                 logger.error(f"Error parsing old forecast timestamp: {e}")
 
@@ -119,6 +126,15 @@ async def update_weather_data_for_location(redis_client, loc: dict):
     y = loc.get("y")
     
     logger.info(f"Fetching data for {loc_id}...")
+    
+    # Ensure astronomy data exists for this location (backfill for existing locations)
+    astro_data_str = await redis_client.get(f"astro:{loc_id}")
+    if not astro_data_str:
+        logger.info(f"Astronomy data missing for {loc_id}, fetching...")
+        _, _, _, astro = await get_nws_gridpoints(loc["lat"], loc["lon"])
+        if astro:
+            await redis_client.set(f"astro:{loc_id}", json.dumps(astro))
+
     raw_data = await fetch_nws_grid_data(wfo, x, y)
     if raw_data:
         old_data_str = await redis_client.get(f"forecast:{loc_id}")
@@ -153,13 +169,15 @@ async def refresh_location_mappings(redis_client):
     for loc_id, loc_str in locations_data.items():
         try:
             loc = json.loads(loc_str)
-            wfo, x, y = await get_nws_gridpoints(loc["lat"], loc["lon"])
+            wfo, x, y, astro = await get_nws_gridpoints(loc["lat"], loc["lon"])
             if wfo and (loc["wfo"] != wfo or loc["x"] != x or loc["y"] != y):
                 logger.info(f"Updating WFO mapping for {loc_id}: {loc['wfo']} -> {wfo}, {loc['x']},{loc['y']} -> {x},{y}")
                 loc["wfo"] = wfo
                 loc["x"] = x
                 loc["y"] = y
                 await redis_client.hset("mws:locations", loc_id, json.dumps(loc))
+            if astro:
+                await redis_client.set(f"astro:{loc_id}", json.dumps(astro))
         except Exception as e:
             logger.error(f"Error refreshing mapping for {loc_id}: {e}")
 
