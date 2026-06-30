@@ -137,11 +137,11 @@ async def update_weather_data_for_location(redis_client, loc: dict):
 
     raw_data = await fetch_nws_grid_data(wfo, x, y)
     if raw_data:
-        old_data_str = await redis_client.get(f"forecast:{loc_id}")
+        old_data_str = await redis_client.get(f"forecast:nws:{loc_id}")
         old_forecast = json.loads(old_data_str) if old_data_str else None
         
         processed_data = process_nws_data(raw_data, old_forecast)
-        await redis_client.set(f"forecast:{loc_id}", json.dumps(processed_data))
+        await redis_client.set(f"forecast:nws:{loc_id}", json.dumps(processed_data))
         logger.info(f"Successfully updated data for {loc_id}")
     else:
         logger.error(f"Failed to fetch data for {loc_id}")

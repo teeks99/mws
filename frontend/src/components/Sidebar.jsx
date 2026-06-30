@@ -16,7 +16,9 @@ export default function Sidebar({
   setTheme,
   sortOrder,
   setSortOrder,
-  onReorder
+  onReorder,
+  source,
+  setSource
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
@@ -108,6 +110,17 @@ export default function Sidebar({
       </div>
 
       <div className="sidebar-footer">
+        <div style={{marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+          <label style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>Data Source</label>
+          <select 
+            value={source} 
+            onChange={e => setSource(e.target.value)}
+            style={{background: 'rgba(0,0,0,0.2)', color: 'white', border: '1px solid var(--panel-border)', borderRadius: '4px', padding: '4px', outline: 'none'}}
+          >
+            <option value="nws">NWS</option>
+            <option value="open-meteo">Open-Meteo</option>
+          </select>
+        </div>
         <div style={{marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
           <label style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>Units</label>
           <select 

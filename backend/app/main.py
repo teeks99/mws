@@ -4,6 +4,7 @@ import redis.asyncio as redis
 import os
 from contextlib import asynccontextmanager
 from app.services.nws import start_nws_scheduler
+from app.services.openmeteo import start_openmeteo_scheduler
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -17,6 +18,9 @@ async def lifespan(app: FastAPI):
     
     # Start background scheduler for NWS data
     scheduler = start_nws_scheduler(redis_client)
+    
+    # Start open-meteo scheduler jobs
+    start_openmeteo_scheduler(scheduler, redis_client)
     
     yield
     
@@ -61,17 +65,15 @@ app.include_router(locations.router)
 async def root():
     return {"message": "Welcome to My Weather Service API"}
 
-@app.get("/api/forecast/{name}", response_model=List[HourlyForecast])
-async def get_forecast(name: str):
+@app.get("/api/forecast/{source}/{name}", response_model=List[HourlyForecast])
+async def get_forecast(source: str, name: str):
     """
-    Retrieve the cached, hourly forecast for a given location.
-    
-    The API returns 168 hours (7 days) of flattened timeseries data.
+    Retrieve the cached, hourly forecast for a given location from a specific source.
     """
     if not redis_client:
         return {"error": "Redis client not initialized"}
     
-    data = await redis_client.get(f"forecast:{name}")
+    data = await redis_client.get(f"forecast:{source}:{name}")
     if data:
         import json
         return json.loads(data)

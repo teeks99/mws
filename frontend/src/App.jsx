@@ -12,6 +12,7 @@ function App() {
   // Initialize from localStorage or fallback to defaults
   const [unitSystem, setUnitSystem] = useState(() => localStorage.getItem('unitSystem') || 'us');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+  const [source, setSource] = useState(() => localStorage.getItem('weatherSource') || 'nws');
   const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('sortOrder') || 'az');
   const [manualOrder, setManualOrder] = useState(() => {
     try { return JSON.parse(localStorage.getItem('manualOrder')) || []; }
@@ -22,6 +23,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem('unitSystem', unitSystem);
   }, [unitSystem]);
+
+  useEffect(() => {
+    localStorage.setItem('weatherSource', source);
+    // Update URL if location is selected
+    if (activeLocation) {
+        window.history.replaceState(null, '', `/${encodeURIComponent(activeLocation.name.toLowerCase())}/${source}`);
+    }
+  }, [source, activeLocation]);
 
   useEffect(() => {
     localStorage.setItem('sortOrder', sortOrder);
@@ -72,14 +81,24 @@ function App() {
       const data = await res.json();
       setLocations(data);
       
-      const pathName = decodeURIComponent(window.location.pathname.substring(1)).toLowerCase();
+      const pathParts = decodeURIComponent(window.location.pathname.substring(1)).toLowerCase().split('/');
+      const pathName = pathParts[0];
+      const pathSource = pathParts[1];
+      
+      let currentSource = source;
+      if (pathSource && (pathSource === 'nws' || pathSource === 'open-meteo')) {
+        currentSource = pathSource;
+        setSource(pathSource);
+      }
+
       const match = pathName ? data.find(loc => loc.name.toLowerCase() === pathName) : null;
       
       if (match) {
         setActiveLocation(match);
+        window.history.replaceState(null, '', `/${encodeURIComponent(match.name.toLowerCase())}/${currentSource}`);
       } else if (data.length > 0 && !activeLocation) {
         setActiveLocation(data[0]);
-        window.history.replaceState(null, '', `/${encodeURIComponent(data[0].name.toLowerCase())}`);
+        window.history.replaceState(null, '', `/${encodeURIComponent(data[0].name.toLowerCase())}/${currentSource}`);
       }
     } catch (err) {
       console.error("Failed to fetch locations", err);
@@ -92,7 +111,14 @@ function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      const pathName = decodeURIComponent(window.location.pathname.substring(1)).toLowerCase();
+      const pathParts = decodeURIComponent(window.location.pathname.substring(1)).toLowerCase().split('/');
+      const pathName = pathParts[0];
+      const pathSource = pathParts[1];
+
+      if (pathSource && (pathSource === 'nws' || pathSource === 'open-meteo')) {
+        setSource(pathSource);
+      }
+
       if (pathName && locations.length > 0) {
         const match = locations.find(loc => loc.name.toLowerCase() === pathName);
         if (match) setActiveLocation(match);
@@ -160,7 +186,7 @@ function App() {
         activeLocation={activeLocation}
         onSelectLocation={(loc) => {
           setActiveLocation(loc);
-          window.history.pushState(null, '', `/${encodeURIComponent(loc.name.toLowerCase())}`);
+          window.history.pushState(null, '', `/${encodeURIComponent(loc.name.toLowerCase())}/${source}`);
           setIsSidebarOpen(false); // Close on selection
         }}
         onAddLocation={handleAddLocation}
@@ -175,12 +201,15 @@ function App() {
         sortOrder={sortOrder}
         setSortOrder={setSortOrder}
         onReorder={handleReorder}
+        source={source}
+        setSource={setSource}
       />
       <Dashboard 
         location={activeLocation} 
         onToggleSidebar={() => setIsSidebarOpen(true)}
         unitSystem={unitSystem}
         theme={theme}
+        source={source}
       />
     </div>
   );

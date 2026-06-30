@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Menu } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
-export default function Dashboard({ location, onToggleSidebar, unitSystem, theme = 'dark' }) {
+export default function Dashboard({ location, onToggleSidebar, unitSystem, theme = 'dark', source = 'nws' }) {
   const [forecast, setForecast] = useState([]);
   const [astronomy, setAstronomy] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -34,7 +34,7 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
       setError(null);
       try {
         const [forecastRes, astroRes] = await Promise.all([
-          fetch(`/api/forecast/${encodeURIComponent(location.name)}`),
+          fetch(`/api/forecast/${source}/${encodeURIComponent(location.name)}`),
           fetch(`/api/astronomy/${encodeURIComponent(location.name)}`)
         ]);
         
@@ -55,7 +55,7 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
     loadData();
 
     return () => { isMounted = false; };
-  }, [location]);
+  }, [location, source]);
 
   useEffect(() => {
     if (location && location.name) {

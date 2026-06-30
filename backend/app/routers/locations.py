@@ -86,7 +86,9 @@ async def add_location(location: LocationCreate, api_key: str = Depends(get_api_
     
     # Optionally trigger an immediate NWS fetch for this location
     from app.services.nws import update_weather_data_for_location
+    from app.services.openmeteo import update_openmeteo_for_location
     await update_weather_data_for_location(main_app.redis_client, loc_data.model_dump())
+    await update_openmeteo_for_location(main_app.redis_client, loc_data.model_dump())
 
     return loc_data
 
@@ -101,7 +103,8 @@ async def remove_location(name: str, api_key: str = Depends(get_api_key)):
         raise HTTPException(status_code=404, detail="Location not found")
         
     # Also delete the cached forecast and astronomy data
-    await main_app.redis_client.delete(f"forecast:{name}")
+    await main_app.redis_client.delete(f"forecast:nws:{name}")
+    await main_app.redis_client.delete(f"forecast:open-meteo:{name}")
     await main_app.redis_client.delete(f"astro:{name}")
     
     return {"message": f"Location '{name}' removed"}
