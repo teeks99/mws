@@ -48,7 +48,17 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
     
     if (!prevLocationRef.current || prevLocationRef.current.name !== location.name || prevLocationRef.current.source !== source) {
       setLoading(true);
-      zoomOffsetRef.current = null;
+      const searchParams = new URLSearchParams(window.location.search);
+      const daysParam = searchParams.get('days');
+      if (daysParam && !isNaN(daysParam)) {
+        const days = parseFloat(daysParam);
+        zoomOffsetRef.current = {
+          startOffset: 0,
+          endOffset: days * 24 * 60 * 60 * 1000
+        };
+      } else {
+        zoomOffsetRef.current = null;
+      }
     }
     prevLocationRef.current = { name: location.name, source };
 

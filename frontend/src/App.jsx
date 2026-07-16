@@ -28,7 +28,7 @@ function App() {
     localStorage.setItem('weatherSource', source);
     // Update URL if location is selected
     if (activeLocation) {
-        window.history.replaceState(null, '', `/${encodeURIComponent(activeLocation.name.toLowerCase())}/${source}`);
+        window.history.replaceState(null, '', `/${encodeURIComponent(activeLocation.name.toLowerCase())}/${source}${window.location.search}`);
     }
   }, [source, activeLocation]);
 
@@ -95,10 +95,10 @@ function App() {
       
       if (match) {
         setActiveLocation(match);
-        window.history.replaceState(null, '', `/${encodeURIComponent(match.name.toLowerCase())}/${currentSource}`);
+        window.history.replaceState(null, '', `/${encodeURIComponent(match.name.toLowerCase())}/${currentSource}${window.location.search}`);
       } else if (data.length > 0 && !activeLocation) {
         setActiveLocation(data[0]);
-        window.history.replaceState(null, '', `/${encodeURIComponent(data[0].name.toLowerCase())}/${currentSource}`);
+        window.history.replaceState(null, '', `/${encodeURIComponent(data[0].name.toLowerCase())}/${currentSource}${window.location.search}`);
       }
     } catch (err) {
       console.error("Failed to fetch locations", err);
@@ -162,7 +162,7 @@ function App() {
       if (res.ok) {
         if (activeLocation?.name === name) {
           setActiveLocation(null);
-          window.history.pushState(null, '', '/');
+          window.history.pushState(null, '', `/${window.location.search}`);
         }
         await fetchLocations();
       } else {
@@ -186,7 +186,7 @@ function App() {
         activeLocation={activeLocation}
         onSelectLocation={(loc) => {
           setActiveLocation(loc);
-          window.history.pushState(null, '', `/${encodeURIComponent(loc.name.toLowerCase())}/${source}`);
+          window.history.pushState(null, '', `/${encodeURIComponent(loc.name.toLowerCase())}/${source}${window.location.search}`);
           setIsSidebarOpen(false); // Close on selection
         }}
         onAddLocation={handleAddLocation}
