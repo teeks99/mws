@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import os
 import httpx
 import json
+import secrets
 import app.main as main_app # to access redis_client
 import logging
 
@@ -14,7 +15,7 @@ router = APIRouter(
 )
 
 class LocationCreate(BaseModel):
-    name: str # e.g., "seattle"
+    name: str = Field(..., pattern=r'^[a-zA-Z0-9\s\-]+$', description="Name of the location, containing only alphanumeric characters, spaces, and hyphens.") # e.g., "seattle"
     lat: float
     lon: float
 
@@ -32,7 +33,7 @@ def get_api_key(x_api_key: str = Header(None)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="ADMIN_API_KEY is not configured on the server."
         )
-    if x_api_key != expected_key:
+    if x_api_key is None or not secrets.compare_digest(x_api_key, expected_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API Key"

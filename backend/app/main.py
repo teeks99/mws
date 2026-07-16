@@ -7,6 +7,11 @@ from app.services.nws import start_nws_scheduler
 from app.services.openmeteo import start_openmeteo_scheduler
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from enum import Enum
+
+class ForecastSource(str, Enum):
+    NWS = "nws"
+    OPEN_METEO = "open-meteo"
 
 redis_client = None
 
@@ -51,10 +56,13 @@ class HourlyForecast(BaseModel):
     pressure: Optional[float] = Field(None, description="Atmospheric Pressure.")
 
 # Setup CORS for frontend
+cors_origins_str = os.getenv("CORS_ORIGINS", "*")
+cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Update this in production
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -66,14 +74,14 @@ async def root():
     return {"message": "Welcome to My Weather Service API"}
 
 @app.get("/api/forecast/{source}/{name}", response_model=List[HourlyForecast])
-async def get_forecast(source: str, name: str):
+async def get_forecast(source: ForecastSource, name: str):
     """
     Retrieve the cached, hourly forecast for a given location from a specific source.
     """
     if not redis_client:
         return {"error": "Redis client not initialized"}
     
-    data = await redis_client.get(f"forecast:{source}:{name}")
+    data = await redis_client.get(f"forecast:{source.value}:{name}")
     if data:
         import json
         return json.loads(data)
