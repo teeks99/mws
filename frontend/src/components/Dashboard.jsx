@@ -8,7 +8,26 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const containerRef = React.useRef(null);
+  const echartsRef = React.useRef(null);
+  const zoomOffsetRef = React.useRef(null);
+  const prevLocationRef = React.useRef(null);
+  const splitTimeRef = React.useRef(null);
   const [chartHeight, setChartHeight] = useState(530);
+
+  const handleDataZoom = () => {
+    if (!echartsRef.current || !splitTimeRef.current) return;
+    const echart = echartsRef.current.getEchartsInstance();
+    const option = echart.getOption();
+    if (option && option.dataZoom && option.dataZoom.length > 0) {
+      const dz = option.dataZoom[0];
+      if (dz.startValue != null && dz.endValue != null) {
+        zoomOffsetRef.current = {
+          startOffset: dz.startValue - splitTimeRef.current,
+          endOffset: dz.endValue - splitTimeRef.current
+        };
+      }
+    }
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -26,12 +45,14 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
     if (!location) return;
 
     let isMounted = true;
-    setLoading(true);
-    setError(null);
+    
+    if (!prevLocationRef.current || prevLocationRef.current.name !== location.name || prevLocationRef.current.source !== source) {
+      setLoading(true);
+      zoomOffsetRef.current = null;
+    }
+    prevLocationRef.current = { name: location.name, source };
 
     const loadData = async () => {
-      setLoading(true);
-      setError(null);
       try {
         const [forecastRes, astroRes] = await Promise.all([
           fetch(`/api/forecast/${source}/${encodeURIComponent(location.name)}`),
@@ -41,20 +62,26 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
         const forecastData = await forecastRes.json();
         const astroData = await astroRes.json();
         
+        if (!isMounted) return;
         if (forecastData.error) throw new Error(forecastData.error);
         
         setForecast(forecastData);
         setAstronomy(astroData.error ? null : astroData);
+        setError(null);
       } catch (err) {
-        setError(err.message);
+        if (isMounted) setError(err.message);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
     
     loadData();
+    const intervalId = setInterval(loadData, 10 * 60 * 1000);
 
-    return () => { isMounted = false; };
+    return () => { 
+      isMounted = false;
+      clearInterval(intervalId);
+    };
   }, [location, source]);
 
   useEffect(() => {
@@ -137,7 +164,7 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
       color: colorTextSecondary,
       hideOverlap: true,
       align: 'left',
-      padding: [0, 0, 0, 6], // Add a 6px left margin to detach from the tick line
+      padding: [0, 2, 0, 2], // Reduced padding so more labels can fit without overlapping
       formatter: (value, index) => {
         const date = new Date(value);
         const hours = date.getHours();
@@ -183,6 +210,7 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
   
   // The time axis (dimension 0) uses Unix timestamps internally in ECharts
   const splitTime = splitIdx > 0 ? new Date(times[splitIdx]).getTime() : 0;
+  splitTimeRef.current = splitTime;
 
   // Compute Night Time blocks (markArea data)
   const nightBlocks = [];
@@ -248,10 +276,24 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
       borderColor: colorTooltipBorder,
       textStyle: { color: colorTextPrimary }
     },
-    dataZoom: [
-      { type: 'inside', xAxisIndex: [0, 1, 2], start: 0, end: 100, filterMode: 'none' },
-      { type: 'slider', xAxisIndex: [0, 1, 2], start: 0, end: 100, bottom: 5, height: 20, textStyle: { color: colorTextSecondary }, filterMode: 'none' }
-    ],
+    dataZoom: (() => {
+      const config = [
+        { type: 'inside', xAxisIndex: [0, 1, 2], filterMode: 'none' },
+        { type: 'slider', xAxisIndex: [0, 1, 2], bottom: 5, height: 20, textStyle: { color: colorTextSecondary }, filterMode: 'none' }
+      ];
+      if (zoomOffsetRef.current && splitTime) {
+        config.forEach(dz => {
+          dz.startValue = splitTime + zoomOffsetRef.current.startOffset;
+          dz.endValue = splitTime + zoomOffsetRef.current.endOffset;
+        });
+      } else {
+        config.forEach(dz => {
+          dz.start = 0;
+          dz.end = 100;
+        });
+      }
+      return config;
+    })(),
     legend: [
       { data: ['Temperature', 'Dew Point', 'Feels Like'], top: 8, textStyle: { color: colorTextSecondary } },
       { data: ['Precip Chance', 'Humidity', 'Cloud Cover'], top: legend2Top, textStyle: { color: colorTextSecondary } },
@@ -349,10 +391,12 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
       <div className="glass-panel chart-container" ref={containerRef} style={{ flex: 1, minHeight: '530px', position: 'relative' }}>
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: '4px' }}>
           <ReactECharts 
+            ref={echartsRef}
             option={combinedOption} 
             style={{ height: '100%', width: '100%' }} 
             theme={isDark ? 'dark' : undefined} 
             opts={{ renderer: 'canvas' }} 
+            onEvents={{ datazoom: handleDataZoom }}
           />
         </div>
       </div>
