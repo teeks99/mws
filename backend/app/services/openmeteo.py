@@ -14,7 +14,7 @@ async def fetch_openmeteo_data(lat: float, lon: float):
     params = {
         "latitude": lat,
         "longitude": lon,
-        "hourly": "temperature_2m,dew_point_2m,apparent_temperature,precipitation_probability,relative_humidity_2m,cloud_cover,wind_speed_10m,wind_direction_10m,precipitation,surface_pressure",
+        "hourly": "temperature_2m,dew_point_2m,apparent_temperature,precipitation_probability,relative_humidity_2m,cloud_cover,wind_speed_10m,wind_direction_10m,precipitation,pressure_msl",
         "forecast_days": 16,
         "timezone": "UTC"
     }
@@ -28,6 +28,11 @@ async def fetch_openmeteo_data(lat: float, lon: float):
         except httpx.HTTPError as exc:
             logger.error(f"Error fetching Open-Meteo data for {lat},{lon}: {exc}")
             return None
+
+def hpa_to_pa(value):
+    """Open-Meteo reports pressure_msl in hPa, but NWS gridpoints report pressure
+    in Pa. Normalize to Pa here so both sources agree on the unit downstream."""
+    return value * 100 if value is not None else None
 
 def process_openmeteo_data(raw_data: dict):
     if not raw_data or 'hourly' not in raw_data:
@@ -60,7 +65,9 @@ def process_openmeteo_data(raw_data: dict):
             "windSpeed": hourly.get("wind_speed_10m", [])[i] if i < len(hourly.get("wind_speed_10m", [])) else None,
             "windDirection": hourly.get("wind_direction_10m", [])[i] if i < len(hourly.get("wind_direction_10m", [])) else None,
             "quantitativePrecipitation": hourly.get("precipitation", [])[i] if i < len(hourly.get("precipitation", [])) else None,
-            "pressure": hourly.get("surface_pressure", [])[i] if i < len(hourly.get("surface_pressure", [])) else None,
+            # pressure_msl (reduced to sea level), not surface_pressure: the latter is
+            # station pressure, which reads ~1 inHg low against a barometer or phone app.
+            "pressure": hpa_to_pa(hourly.get("pressure_msl", [])[i] if i < len(hourly.get("pressure_msl", [])) else None),
         }
         result.append(item)
         

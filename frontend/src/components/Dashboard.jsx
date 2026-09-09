@@ -147,7 +147,7 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
   const isUS = unitSystem === 'us';
   const convertTemp = (c) => isUS && c != null ? (c * 9/5) + 32 : c;
   const convertSpeed = (kmh) => isUS && kmh != null ? kmh / 1.60934 : kmh;
-  const convertPressure = (pa) => isUS && pa != null ? pa * 0.0002953 : pa; // Pa to inHg
+  const convertPressure = (pa) => pa == null ? pa : (isUS ? pa * 0.0002953 : pa / 100); // Pa to inHg / hPa
 
   const getCardinalDirection = (angle) => {
     if (angle == null) return '';
@@ -327,7 +327,7 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
       },
       { gridIndex: 1, type: 'value', name: '%', max: 100, axisLabel: { color: colorTextSecondary }, splitLine: { lineStyle: { color: colorSplitLine } } },
       { gridIndex: 2, type: 'value', name: isUS ? 'mph' : 'km/h', position: 'left', axisLabel: { color: colorTextSecondary }, splitLine: { lineStyle: { color: colorSplitLine } } },
-      { gridIndex: 2, type: 'value', name: isUS ? 'inHg' : 'Pa', position: 'right', scale: true, axisLabel: { color: colorTextSecondary }, splitLine: { lineStyle: { color: colorSplitLine } } },
+      { gridIndex: 2, type: 'value', name: isUS ? 'inHg' : 'hPa', position: 'right', scale: true, axisLabel: { color: colorTextSecondary }, splitLine: { lineStyle: { color: colorSplitLine } } },
       { gridIndex: 2, type: 'value', show: false } // Invisible 3rd axis for Wind Dir tooltips
     ],
     series: [

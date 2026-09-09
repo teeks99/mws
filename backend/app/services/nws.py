@@ -61,11 +61,14 @@ def process_nws_data(raw_data: dict, old_forecast: list = None):
 
     props = raw_data['properties']
     
+    # "pressure" is deliberately absent: NWS publishes it as one of ~30 gridpoint
+    # metrics that are permanently `{"values": []}` (verified against LOT, SEW,
+    # MFL, BOU and OKX). Pressure comes from Open-Meteo instead, normalized to Pa.
     metrics = [
         "temperature", "dewpoint", "apparentTemperature", 
         "probabilityOfPrecipitation", "relativeHumidity", 
         "skyCover", "windSpeed", "windDirection", 
-        "quantitativePrecipitation", "pressure"
+        "quantitativePrecipitation"
     ]
     
     # We want to build an hourly array starting from the current UTC hour

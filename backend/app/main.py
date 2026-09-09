@@ -53,7 +53,7 @@ class HourlyForecast(BaseModel):
     windSpeed: Optional[float] = Field(None, description="Wind Speed in Kilometers per hour (km/h).")
     windDirection: Optional[float] = Field(None, description="Wind Direction in Degrees (Angle from true North, 0-360).")
     quantitativePrecipitation: Optional[float] = Field(None, description="Amount of Precipitation in Millimeters (mm).")
-    pressure: Optional[float] = Field(None, description="Atmospheric Pressure.")
+    pressure: Optional[float] = Field(None, description="Atmospheric Pressure reduced to mean sea level, in Pascals (Pa). Only supplied by the open-meteo source; NWS publishes this metric as permanently empty.")
 
 # Setup CORS for frontend
 cors_origins_str = os.getenv("CORS_ORIGINS", "*")
