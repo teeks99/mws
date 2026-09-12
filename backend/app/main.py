@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import redis.asyncio as redis
+import json
 import os
 from contextlib import asynccontextmanager
 from app.services.nws import start_nws_scheduler
@@ -79,14 +80,19 @@ async def get_forecast(source: ForecastSource, name: str):
     Retrieve the cached, hourly forecast for a given location from a specific source.
     """
     if not redis_client:
-        return {"error": "Redis client not initialized"}
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Redis client not initialized"
+        )
     
     data = await redis_client.get(f"forecast:{source.value}:{name}")
     if data:
-        import json
         return json.loads(data)
     
-    return {"error": "Forecast not found for this location"}
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"No {source.value} forecast cached for '{name}' yet."
+    )
 
 @app.get("/api/astronomy/{name}")
 async def get_astronomy(name: str):
@@ -94,11 +100,16 @@ async def get_astronomy(name: str):
     Retrieve the cached astronomical data (sunrise/sunset) for a given location.
     """
     if not redis_client:
-        return {"error": "Redis client not initialized"}
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Redis client not initialized"
+        )
     
     data = await redis_client.get(f"astro:{name}")
     if data:
-        import json
         return json.loads(data)
         
-    return {"error": "Astronomy data not found for this location"}
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"No astronomy data cached for '{name}' yet."
+    )

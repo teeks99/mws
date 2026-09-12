@@ -69,14 +69,21 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
           fetch(`/api/astronomy/${encodeURIComponent(location.name)}`)
         ]);
         
+        if (!forecastRes.ok) {
+          // FastAPI reports the reason in `detail`; fall back to the status code
+          // if the body isn't JSON (e.g. a reverse proxy error page).
+          const body = await forecastRes.json().catch(() => null);
+          throw new Error(body?.detail || `Forecast request failed (HTTP ${forecastRes.status})`);
+        }
+
         const forecastData = await forecastRes.json();
-        const astroData = await astroRes.json();
+        // Night shading is optional, so missing astronomy data isn't an error.
+        const astroData = astroRes.ok ? await astroRes.json() : null;
         
         if (!isMounted) return;
-        if (forecastData.error) throw new Error(forecastData.error);
         
         setForecast(forecastData);
-        setAstronomy(astroData.error ? null : astroData);
+        setAstronomy(astroData);
         setError(null);
       } catch (err) {
         if (isMounted) setError(err.message);
