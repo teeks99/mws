@@ -49,9 +49,12 @@ export default function Dashboard({ location, onToggleSidebar, unitSystem, theme
     if (!prevLocationRef.current || prevLocationRef.current.name !== location.name || prevLocationRef.current.source !== source) {
       setLoading(true);
       const searchParams = new URLSearchParams(window.location.search);
-      const daysParam = searchParams.get('days');
-      if (daysParam && !isNaN(daysParam)) {
-        const days = parseFloat(daysParam);
+      // Number() rather than parseFloat() so trailing garbage like "2abc" is
+      // rejected outright; isFinite + > 0 then screens out whitespace, zero,
+      // negatives and Infinity, each of which would otherwise put a NaN or an
+      // inverted range into the chart's dataZoom bounds.
+      const days = Number(searchParams.get('days'));
+      if (Number.isFinite(days) && days > 0) {
         zoomOffsetRef.current = {
           startOffset: 0,
           endOffset: days * 24 * 60 * 60 * 1000
