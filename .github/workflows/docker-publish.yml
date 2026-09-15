@@ -3,6 +3,8 @@ name: Build and Publish Docker Images
 on:
   push:
     branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
   schedule:
     - cron: '0 0 * * 0' # Once a week on Sunday at midnight
 
@@ -16,7 +18,121 @@ env:
   GHCR_IMAGE_NAME_BACKEND: ${{ github.repository }}/mws-backend
 
 jobs:
+  verify-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # Track the Dockerfile's base image so a Dependabot bump to it is exercised
+      # here, at the version that will actually ship, before anything publishes.
+      - name: Read Node version from the Dockerfile
+        id: node
+        run: |
+          version=$(grep -oP '^FROM node:\K[0-9]+' Dockerfile)
+          [ -n "$version" ] || { echo "::error::Could not read a Node version from frontend/Dockerfile"; exit 1; }
+          echo "Verifying against Node $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `npm ci` installs strictly from the lockfile, so this also catches
+      # package.json and package-lock.json drifting apart.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  verify-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Read Python version from the Dockerfile
+        id: python
+        run: |
+          version=$(grep -oP '^FROM python:\K[0-9]+\.[0-9]+' Dockerfile)
+          [ -n "$version" ] || { echo "::error::Could not read a Python version from backend/Dockerfile"; exit 1; }
+          echo "Verifying against Python $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ steps.python.outputs.version }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # A clean `pip install` says nothing about whether the app actually loads:
+      # a bad import or syntax error still builds an image that crash-loops.
+      - name: Import check
+        run: python -c "import app.main"
+
+      - name: Smoke test the API
+        shell: bash
+        env:
+          REDIS_URL: redis://localhost:6379/0
+          ADMIN_API_KEY: ci-smoke-test-key
+          NWS_USER_AGENT: "MyWeatherService-CI/1.0 (ci@example.com)"
+        run: |
+          uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/uvicorn.log 2>&1 &
+
+          ready=0
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/ >/dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" != 1 ]; then
+            echo "::error::API never became ready"; cat /tmp/uvicorn.log; exit 1
+          fi
+
+          curl -sf http://127.0.0.1:8000/ | grep -q "My Weather Service"
+
+          # A location with nothing cached must answer 404, not 500. Returning an
+          # error dict from an endpoint with a response_model fails validation and
+          # surfaces as an unparseable 500.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/forecast/nws/no-such-location)
+          [ "$code" = "404" ] || { echo "::error::expected 404 for an uncached forecast, got $code"; exit 1; }
+
+          curl -sf http://127.0.0.1:8000/api/locations/ | python -c "import json,sys; assert isinstance(json.load(sys.stdin), list)"
+          curl -sf http://127.0.0.1:8000/openapi.json > /dev/null
+
   build-and-push:
+    needs: [verify-frontend, verify-backend]
+    # Pull requests get verified above, but only main publishes images.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
