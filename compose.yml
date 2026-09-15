@@ -1,24 +1,54 @@
 services:
   frontend:
     image: teeks99/mws-frontend:latest
+    restart: unless-stopped
     ports:
       - "5125:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     depends_on:
-      - api
+      api:
+        # Only service_started: nginx needs the "api" hostname to resolve at
+        # config load, but the UI should still come up to report an error if
+        # the backend is sick, rather than the whole site being unreachable.
+        condition: service_started
 
   api:
     image: teeks99/mws-backend:latest
+    restart: unless-stopped
     ports:
       - "5126:8000"
     env_file:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
+    healthcheck:
+      # The python:slim base ships neither curl nor wget, so probe with the stdlib.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     depends_on:
-      - redis
+      redis:
+        # The scheduler fires an NWS poll the moment the app starts. If Redis
+        # isn't accepting connections yet that poll fails and the next one is an
+        # hour away, so wait for a real PONG rather than just a started container.
+        condition: service_healthy
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     volumes:
       - redis_data:/data
 
