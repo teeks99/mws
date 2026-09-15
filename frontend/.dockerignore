@@ -1,0 +1,27 @@
+# The Dockerfile runs `npm install` and then `COPY . .`. Without this line the
+# host's node_modules (~290 MB, with host-platform native binaries) overwrites
+# the tree npm just installed for the image.
+node_modules/
+
+# Build output is generated inside the image by `npm run build`
+dist/
+dist-ssr/
+
+# Never bake secrets into an image layer. Vite reads .env files at build time,
+# so add any build-time VITE_* vars as build args rather than a committed file.
+.env
+.env.*
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS cruft
+.vscode/
+.idea/
+.DS_Store
+
+# Build-time metadata the running image has no use for
+Dockerfile
+.dockerignore

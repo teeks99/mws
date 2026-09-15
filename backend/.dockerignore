@@ -1,0 +1,22 @@
+# Local virtualenv: ~80 MB of host-specific binaries with absolute paths baked
+# in. The Dockerfile installs its own deps, so copying this in is pure waste.
+venv/
+.venv/
+env/
+
+# Python bytecode and tool caches
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Never bake secrets into an image layer
+.env
+.env.*
+
+# Build-time metadata the running image has no use for. requirements.txt is
+# deliberately NOT listed: the Dockerfile copies it before installing.
+Dockerfile
+.dockerignore
+requirements.in
