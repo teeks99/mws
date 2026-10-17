@@ -20,7 +20,7 @@ certifi==2026.6.17
     #   httpx
 click==8.4.2
     # via uvicorn
-fastapi==0.142.2
+fastapi==0.143.0
     # via -r requirements.in
 h11==0.16.0
     # via
@@ -38,12 +38,12 @@ isodate==0.7.2
     # via -r requirements.in
 opentelemetry-api==1.45.0
     # via fastapi
-pydantic==2.13.5
+pydantic==2.14.1
     # via
     #   -r requirements.in
     #   fastapi
     #   pydantic-settings
-pydantic-core==2.46.5
+pydantic-core==2.50.1
     # via pydantic
 pydantic-settings==2.15.0
     # via -r requirements.in
@@ -62,7 +62,7 @@ typing-extensions==4.16.0
     #   pydantic-core
     #   starlette
     #   typing-inspection
-typing-inspection==0.4.2
+typing-inspection==0.4.4
     # via
     #   fastapi
     #   pydantic
