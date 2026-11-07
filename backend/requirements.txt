@@ -38,14 +38,14 @@ isodate==0.7.2
     # via -r requirements.in
 opentelemetry-api==1.45.0
     # via fastapi
-pydantic==2.14.1
+pydantic==2.14.2
     # via
     #   -r requirements.in
     #   fastapi
     #   pydantic-settings
-pydantic-core==2.50.1
+pydantic-core==2.50.2
     # via pydantic
-pydantic-settings==2.16.1
+pydantic-settings==2.16.2
     # via -r requirements.in
 python-dotenv==1.2.2
     # via pydantic-settings
